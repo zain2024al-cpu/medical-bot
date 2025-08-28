@@ -1,5 +1,6 @@
 import sqlite3
 import logging
+import os
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler
 
@@ -133,7 +134,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ========= تشغيل البوت =========
 def main():
-    from secrets import TOKEN
+    # جلب التوكن من environment variables في Render
+    TOKEN = os.environ['TOKEN']
+    
     app = Application.builder().token(TOKEN).build()
 
     # محادثة إضافة العمليات
