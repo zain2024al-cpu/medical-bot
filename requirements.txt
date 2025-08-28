@@ -1,1 +1,12 @@
-
+python-telegram-bot==20.4
+pandas==2.3.2
+matplotlib==3.10.5
+numpy==2.2.6
+pillow==10.5.0
+reportlab==4.4.3
+openpyxl==3.1.5
+anyio
+python-telegram-bot==20.4
+httpx[http2]
+httpcore[asyncio]
+pytz
