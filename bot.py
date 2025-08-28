@@ -3,6 +3,7 @@ import logging
 import os
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler
+from tabulate import tabulate  # مكتبة جديدة للجداول
 
 # ========= إعداد التسجيل =========
 logging.basicConfig(
@@ -122,11 +123,63 @@ async def simple_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"• استخدام /add لإضافة عمليات جديدة"
     )
 
+# ========= دالة التقرير المفصل الجديدة (المرحلة 1) =========
+async def detailed_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إنشاء تقرير مفصل بجدول"""
+    try:
+        # جلب جميع البيانات من قاعدة البيانات
+        cursor.execute("""
+            SELECT date, patient, hospital, department, doctor, procedure, amount 
+            FROM operations ORDER BY date DESC
+        """)
+        data = cursor.fetchall()
+
+        if not data:
+            await update.message.reply_text("📭 لا توجد عمليات مسجلة")
+            return
+
+        # إنشاء جدول البيانات
+        headers = ["التاريخ", "المريض", "المستشفى", "القسم", "الطبيب", "الإجراء", "المبلغ"]
+        
+        # تحويل البيانات إلى قائمة من القوائم
+        table_data = []
+        for row in data:
+            table_data.append([
+                row[0], row[1], row[2], row[3], row[4], row[5], f"{row[6]:.2f}"
+            ])
+
+        # إنشاء الجدول باستخدام tabulate
+        table = tabulate(table_data, headers=headers, tablefmt="grid")
+
+        # إضافة الإجماليات
+        cursor.execute("SELECT COUNT(*), SUM(amount) FROM operations")
+        count, total = cursor.fetchone()
+        
+        summary = f"\n📊 **الإجماليات:**\n"
+        summary += f"• عدد العمليات: {count}\n"
+        summary += f"• مجموع المبالغ: {total:.2f}\n"
+
+        # إرسال التقرير (مقسم إذا كان طويلاً)
+        report = f"📋 **التقرير المفصل للعمليات**\n\n```\n{table}\n```\n{summary}"
+        
+        if len(report) > 4000:
+            # إذا كان التقرير طويلاً، نقسمه
+            parts = [report[i:i+4000] for i in range(0, len(report), 4000)]
+            for part in parts:
+                await update.message.reply_text(part, parse_mode='Markdown')
+        else:
+            await update.message.reply_text(report, parse_mode='Markdown')
+
+    except Exception as e:
+        logger.error(f"Error in detailed_report: {e}")
+        await update.message.reply_text("❌ حدث خطأ أثناء إنشاء التقرير")
+
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = """
 🏥 **أوامر البوت**:
 /add - إضافة عملية جديدة
-/report - عرض تقرير مبسط
+/report - عرض تقرير مفصل
+/simple_report - تقرير مبسط
 /help - المساعدة
 /cancel - إلغاء العملية الحالية
 """
@@ -157,7 +210,8 @@ def main():
     )
 
     app.add_handler(add_conv)
-    app.add_handler(CommandHandler("report", simple_report))
+    app.add_handler(CommandHandler("report", detailed_report))  # التقرير المفصل
+    app.add_handler(CommandHandler("simple_report", simple_report))  # التقرير المبسط
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("start", help_command))
 
